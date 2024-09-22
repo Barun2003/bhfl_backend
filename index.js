@@ -3,55 +3,54 @@ const bodyParser = require("body-parser");
 const base64js = require("base64-js");
 const app = express();
 
+// Middleware to parse JSON bodies
 app.use(bodyParser.json());
 
+// Helper function to extract numbers and alphabets
 function extractNumbersAndAlphabets(data) {
   const numbers = data.filter(item => /^\d+$/.test(item));
   const alphabets = data.filter(item => /^[a-zA-Z]+$/.test(item));
   return { numbers, alphabets };
 }
 
+// Helper function to get the highest lowercase alphabet
 function getHighestLowercase(alphabets) {
   const lowercaseLetters = alphabets.filter(item => /^[a-z]+$/.test(item));
   return lowercaseLetters.length > 0 ? lowercaseLetters.sort().pop() : "";
 }
 
+// POST request endpoint
 app.post("/bfhl", (req, res) => {
   try {
     const { user_id, email, roll_number, data: requestData } = req.body;
+    const { data, file_b64 } = requestData;
 
-    // Error: Missing required fields
-    if (!user_id || !email || !roll_number || !requestData) {
-      return res.status(400).json({ error: "Missing required fields: user_id, email, roll_number, or data" });
-    }
+    // Extract numbers and alphabets
+    const { numbers, alphabets } = extractNumbersAndAlphabets(data);
 
-    // Error: Data is not an array
-    if (!Array.isArray(requestData.data)) {
-      return res.status(400).json({ error: "Data field must be an array" });
-    }
-
-    // Extract numbers and alphabets from the data array
-    const { numbers, alphabets } = extractNumbersAndAlphabets(requestData.data);
-
+    // Get highest lowercase alphabet
     const highestLowercase = getHighestLowercase(alphabets);
 
+    // Handle file validation and processing
     let fileValid = false;
     let fileMimeType = null;
     let fileSizeKb = 0;
 
-    if (requestData.file_b64) {
+    if (file_b64) {
       try {
-        // Check if the base64 string is valid
-        const fileData = base64js.toByteArray(requestData.file_b64);
+        // Decode base64 file
+        const fileData = base64js.toByteArray(file_b64);
         fileValid = true;
-        fileMimeType = "application/octet-stream"; // You can replace this with a better MIME type check
+        fileMimeType = "application/octet-stream"; // You can modify this based on actual file analysis
         fileSizeKb = (fileData.length / 1024).toFixed(2);
       } catch (error) {
-        return res.status(400).json({ error: "Invalid file_b64 encoding" });
+        fileValid = false;
+        fileMimeType = null;
+        fileSizeKb = 0;
       }
     }
 
-    // Successful response
+    // Response
     res.json({
       is_success: true,
       user_id: "barun81",
@@ -64,18 +63,19 @@ app.post("/bfhl", (req, res) => {
         file_valid: fileValid,
         file_mime_type: fileMimeType,
         file_size_kb: fileSizeKb,
-      },
+      }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "An unexpected error occurred" });
+    res.status(400).json({ error: "Invalid input" });
   }
 });
 
+// GET request endpoint
 app.get("/bfhl", (req, res) => {
   res.status(200).json({ operation_code: 1 });
 });
 
+// Set the server to listen on port 3000
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
