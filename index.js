@@ -4,13 +4,6 @@ import multer from "multer";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-const app = express();
-const port = 3000;
-
-app.use(express.json());
-app.use(cors());
-
-// Helper function to validate Base64
 const isValidBase64 = (str) => {
   try {
     Buffer.from(str, "base64").toString("binary");
@@ -20,39 +13,38 @@ const isValidBase64 = (str) => {
   }
 };
 
-// GET request
+const app = express();
+const port = 3000;
+
+app.use(express.json());
+app.use(cors());
+
 app.get("/bfhl", (req, res) => {
   res.status(200).json({ operation_code: 1 });
 });
 
-// POST request
-app.post("/bfhl", (req, res) => {
+app.post("/bfhl", upload.single("file_b64"), (req, res) => {
   try {
-    const requestData = JSON.parse(req.body.data);
-    const file_b64 = req.body.file_b64;
+    const data = JSON.parse(req.body.data);
+    const file = req.file;
 
-    // Validate file if provided
-    let fileValid = false;
-    let fileType = null;
-    let fileSizeKb = 0;
-
-    if (file_b64 && isValidBase64(file_b64)) {
-      fileValid = true;
-      const fileBuffer = Buffer.from(file_b64, "base64");
-      fileType = "application/octet-stream"; // Set appropriate MIME type
-      fileSizeKb = (fileBuffer.length / 1024).toFixed(2);
-    }
+    const fileValid = file && isValidBase64(file.buffer.toString("base64"));
+    const fileType = file && file.mimetype;
+    const fileSizeKb = file && (file.size / 1024).toFixed(2);
 
     let numbers = [];
     let alphabets = [];
     let highestLowerCase = null;
 
-    requestData.data.forEach((item) => {
+    data.data.forEach((item) => {
       if (!isNaN(item)) {
         numbers.push(item);
-      } else if (typeof item === "string" && item.length === 1) {
+      } else if (typeof item === "string") {
         alphabets.push(item);
-        if (item === item.toLowerCase() && (!highestLowerCase || item > highestLowerCase)) {
+        if (
+          item === item.toLowerCase() &&
+          (!highestLowerCase || item > highestLowerCase)
+        ) {
           highestLowerCase = item;
         }
       }
@@ -71,13 +63,17 @@ app.post("/bfhl", (req, res) => {
       file_size_kb: fileSizeKb
     };
 
+    if (!fileValid) {
+      response.file_valid = false;
+    }
+
     res.status(200).json(response);
   } catch (error) {
-    console.error(error);
-    res.status(400).json({ error: "Invalid input or request failed" });
+    console.log(error);
+    res.status(200).json({ wrong: true });
   }
 });
 
 app.listen(port, () => {
-  console.log(`App listening at http://localhost:${port}`);
+  console.log("app listening at 3000 | http://localhost:3000");
 });
